@@ -1,26 +1,43 @@
-
+var uuid = require('uuid/v4');
 
 module.exports = class TestService {
     constructor(client) {
-        // PostgreSQL Client
         this.client = client;
     }
 
     async selectAll() {
-        console.log('selectAll');
-        return this.client.query("select * from t_test order by sort_order");
+        const db = this.client;
+
+        return new Promise((resolve, reject) => {
+            db.all("select * from t_test order by sort_order", (err, rows) => {
+                if (err) {
+                    return reject(err);
+                } else {
+                    return resolve(rows);
+                }
+            });
+        });
     }
 
     async selectById(id) {
-        return this.client.query("select * from t_test where id = $1", [id]);
+        const db = this.client;
+        return new Promise((resolve, reject) => {
+            const stmt = db.prepare("select * from t_test where id = ?");
+            stmt.get([id], (err, row) => {
+                if (err) {
+                    return reject(err);
+                } else {
+                    return resolve(row);
+                }
+            });
+        });
     }
 
     async insert(data) {
         // uuidを生成
-        const resultOfGuid = await this.client.query("select gen_random_uuid() as guid");
-        const guid = resultOfGuid.rows[0].guid;
+        const guid = uuid();
 
-        const sql = 'insert into t_test (id, col1, col2, col3, sort_order) values ($1, $2, $3, $4, $5)';
+        const sql = 'insert into t_test (id, col1, col2, col3, sort_order) values (?, ?, ?, ?, ?)';
         const values = [
             guid,
             data.col1,
@@ -28,12 +45,17 @@ module.exports = class TestService {
             data.col3,
             data.sort_order ? data.sort_order : 0
         ];
-        await this.client.query(sql, values);
-        return guid;
+
+        const db = this.client;
+
+        return new Promise((resolve, reject) => {
+            db.run(sql, values);
+            return resolve(guid);
+        });
     }
 
     async update(id, data) {
-        const sql = 'update t_test set col1=$1, col2=$2, col3=$3, sort_order=$4 where id = $5';
+        const sql = 'update t_test set col1=?, col2=?, col3=?, sort_order=? where id = ?';
         const values = [
             data.col1,
             data.col2,
@@ -41,15 +63,25 @@ module.exports = class TestService {
             data.sort_order ? data.sort_order : 0,
             id
         ];
-        await this.client.query(sql, values);
-        return id;
+
+        const db = this.client;
+
+        return new Promise((resolve, reject) => {
+            db.run(sql, values);
+            return resolve(id);
+        });
     }
 
     async delete(id) {
         const sql = 'delete from t_test where id = $1';
         const values = [id];
-        await this.client.query(sql, values);
-        return id;
+
+        const db = this.client;
+
+        return new Promise((resolve, reject) => {
+            db.run(sql, values);
+            return resolve(id);
+        });
     }
 }
 
